@@ -44,6 +44,11 @@ const ClerkWebHook = async (req: Request, res: Response) => {
                 break;
             }
 
+            case "paymentAttempt.updated": {
+                if ((data.charge_type === "recurring"))
+                break;
+            }
+
             default:
                 break;
         }
