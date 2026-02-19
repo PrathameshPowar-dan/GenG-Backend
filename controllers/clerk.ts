@@ -45,16 +45,17 @@ const ClerkWebHook = async (req: Request, res: Response) => {
             }
 
             case "paymentAttempt.updated": {
+                console.log(data)
                 if ((data.charge_type === "recurring" || data.charge_type ==="checkout") && data.status === "paid"){
-                    const credits = {pro: 10}
+                    const credits = { pro_user: 10 }
                     const clerkUserId = data?.payer?.user_id;
                     const planId: keyof typeof credits = data?.subscription_items?.[0]?.plan?.slug;
 
-                    if (planId !== "pro") {
+                    if (!credits[planId]) {
                         return res.status(400).json({ message: "Invalid plan" });
                     }
 
-                    console.log(planId);
+                    console.log("PlanID",planId);
 
                     await prisma.user.update({
                         where: {

@@ -4,7 +4,8 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "image" TEXT NOT NULL,
-    "credits" INTEGER NOT NULL DEFAULT 20,
+    "ImageCredits" INTEGER NOT NULL DEFAULT 20,
+    "VideoCredits" INTEGER NOT NULL DEFAULT 20,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -17,7 +18,6 @@ CREATE TABLE "Project" (
     "name" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "productName" TEXT NOT NULL,
-    "productDescription" TEXT NOT NULL DEFAULT '',
     "userPrompt" TEXT NOT NULL DEFAULT '',
     "aspectRatio" TEXT NOT NULL DEFAULT '9:16',
     "targetLength" INTEGER NOT NULL DEFAULT 5,
