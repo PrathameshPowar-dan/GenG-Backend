@@ -45,17 +45,26 @@ const ClerkWebHook = async (req: Request, res: Response) => {
             }
 
             case "paymentAttempt.updated": {
-                console.log(data)
-                if ((data.charge_type === "recurring" || data.charge_type ==="checkout") && data.status === "paid"){
-                    const credits = { pro_user: 10 }
-                    const clerkUserId = data?.payer?.user_id;
-                    const planId: keyof typeof credits = data?.subscription_items?.[0]?.plan?.slug;
+                console.log(data);
+                if ((data.charge_type === "recurring" || data.charge_type === "checkout") && data.status === "paid") {
+                    
+                    const planAllocations: Record<string, { image: number, video: number }> = {
+                        "pro_user": {
+                            image: 999999, // Massive number represents 'Unlimited'
+                            video: 10      
+                        }
+                    };
 
-                    if (!credits[planId]) {
-                        return res.status(400).json({ message: "Invalid plan" });
+                    const clerkUserId = data?.payer?.user_id;
+                    const planId = data?.subscription_items?.[0]?.plan?.slug as string;
+                    
+                    const allocation = planAllocations[planId];
+
+                    if (!allocation) {
+                        return res.status(400).json({ message: "Invalid plan or plan slug not found" });
                     }
 
-                    console.log("PlanID",planId);
+                    console.log("Processing PlanID:", planId);
 
                     await prisma.user.update({
                         where: {
@@ -63,13 +72,13 @@ const ClerkWebHook = async (req: Request, res: Response) => {
                         },
                         data: {
                             ImageCredits: {
-                                increment: credits[planId]
+                                increment: allocation.image
                             },
                             VideoCredits: {
-                                increment: credits[planId]
+                                increment: allocation.video
                             }
                         }
-                    })
+                    });
                 }
                 break;
             }
