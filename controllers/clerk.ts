@@ -62,7 +62,10 @@ const ClerkWebHook = async (req: Request, res: Response) => {
                             id: clerkUserId
                         },
                         data: {
-                            credits: {
+                            ImageCredits: {
+                                increment: credits[planId]
+                            },
+                            VideoCredits: {
                                 increment: credits[planId]
                             }
                         }
