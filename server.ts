@@ -13,7 +13,7 @@ app.post("/api/clerk",express.raw({type: 'application/json'}), ClerkWebHook);
 app.use(express.json());
 app.use(clerkMiddleware());
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8001;
 
 app.get('/', (req: Request, res: Response) => {
     res.send('Server is Live!');
