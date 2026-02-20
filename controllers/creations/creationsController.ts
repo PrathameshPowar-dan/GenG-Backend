@@ -324,11 +324,12 @@ export const deleteCreation = async (req: Request, res: Response) => {
         }
 
         await prisma.project.delete({
-            where: { id: projectId, userId: userId }
+            where: { id: projectId }
         });
 
 
         res.json({ message: "Creation deleted successfully" });
+        
     } catch (error: any) {
         console.error("Error deleting creation:", error);
         res.status(500).json({ error: "Failed to delete creation" });
