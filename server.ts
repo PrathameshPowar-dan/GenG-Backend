@@ -4,6 +4,7 @@ import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 import ClerkWebHook from "./controllers/clerk.js";
 import userRoutes from "./routes/userRoutes.js";
+import creationRoutes from "./routes/creationRoutes.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.use('/api/user', userRoutes);
+app.use('/api/create', creationRoutes);
 
 
 app.listen(port, () => {
