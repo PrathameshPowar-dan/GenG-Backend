@@ -4,6 +4,8 @@ import { v2 as cloudinary } from "cloudinary";
 import { GenerateContentConfig, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import fs from "fs";
 import ai from "../../configs/ai.js";
+import axios from "axios";
+import path from "path";
 
 const loadImage = (path: string, mimeType: string) => {
     return {
@@ -152,10 +154,10 @@ export const createImageCreation = async (req: Request, res: Response) => {
         res.json({ creationId: creation.id });
 
     } catch (error: any) {
-        if (tempProjectId!){
+        if (tempProjectId!) {
             await prisma.project.update({
                 where: { id: tempProjectId },
-                data:{
+                data: {
                     isGenerating: false,
                     error: error.message || "Failed to generate image"
                 }
@@ -179,14 +181,14 @@ export const createImageCreation = async (req: Request, res: Response) => {
 // Controller to create video
 export const createVideoCreation = async (req: Request, res: Response) => {
     const { userId } = req.auth();
-    const {projectId} = req.body;
+    const { projectId } = req.body;
     let isVideoCreditDeducted = false;
 
     const user = await prisma.user.findUnique({
         where: { id: userId }
     });
 
-    if (!user || user.VideoCredits<1) {
+    if (!user || user.VideoCredits < 1) {
         return res.status(400).json({ error: "Insufficient video credits" });
     }
 
@@ -216,9 +218,7 @@ export const createVideoCreation = async (req: Request, res: Response) => {
             data: { isGenerating: true }
         });
 
-        const prompt = {
-            text: `Make the person showcase the product which is ${creation.productName} and do it in a natural and humanly way. Make the video look like a real person is showcasing the product in a real environment. The video should be of ecommerce-quality. ${creation.userPrompt ? `Incorporate this user prompt into the video: ${creation.userPrompt}` : ""}`,
-        }
+        const prompt = `Make the person showcase the product which is ${creation.productName} and do it in a natural and humanly way. Make the video look like a real person is showcasing the product in a real environment. The video should be of ecommerce-quality. ${creation.userPrompt ? `Incorporate this user prompt into the video: ${creation.userPrompt}` : ""}`;
 
         const model = "veo-3.1-generate-preview";
 
@@ -226,7 +226,81 @@ export const createVideoCreation = async (req: Request, res: Response) => {
             throw new Error("No generated image found for video creation");
         }
 
+        const image = await axios.get(creation.generatedImage, { responseType: 'arraybuffer' });
+
+        const imageBytes: any = Buffer.from(image.data)
+
+        let operation: any = await ai.models.generateVideos({
+            model,
+            prompt,
+            image: {
+                imageBytes: imageBytes.toString('base64'),
+                mimeType: "image/png"
+            },
+            config: {
+                aspectRatio: creation?.aspectRatio || '9:16',
+                numberOfVideos: 1,
+                resolution: "720p",
+            }
+        });
+
+        while (!operation.done) {
+            console.log("Waiting for video generation to complete...")
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            operation = await ai.operations.getVideosOperation({
+                operation: operation,
+            })
+        }
+
+        const filename = `${userId}-${Date.now()}.mp4`;
+        const filePath = path.join("videos", filename);
+
+        fs.mkdirSync("videos", { recursive: true });
+
+        if (!operation.response.generatedVideos) {
+            throw new Error(operation.response.raiMediaFilteredReason[0] || "No video generated");
+        };
+
+        await ai.files.download({
+            file: operation.response.generatedVideos[0].video,
+            downloadPath: filePath
+        })
+
+        const uploadResult = await cloudinary.uploader.upload(filePath, {
+            resource_type: "video",
+        });
+
+
+        await prisma.project.update({
+            where: { id: projectId },
+            data: {
+                generatedVideo: uploadResult.secure_url,
+                isGenerating: false
+            }
+        });
+
+        fs.unlinkSync(filePath);
+
+        res.json({ message: "Video generation successful", videoUrl: uploadResult.secure_url });
+
     } catch (error: any) {
+            await prisma.project.update({
+                where: { id: projectId, userId: userId },
+                data: {
+                    isGenerating: false,
+                    error: error.message || "Failed to generate video"
+                }
+            })
+
+        if (isVideoCreditDeducted) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    VideoCredits: { increment: 1 }
+                }
+            })
+        }
+
         console.error("Error creating video creation:", error);
         res.status(500).json({ error: "Failed to create video creation" });
     }
@@ -236,6 +310,25 @@ export const createVideoCreation = async (req: Request, res: Response) => {
 export const deleteCreation = async (req: Request, res: Response) => {
     try {
 
+        const { userId } = req.auth();
+        const { ProjectId } = req.params;
+
+        const projectId = Array.isArray(ProjectId) ? ProjectId[0] : ProjectId;
+
+        const creation = await prisma.project.findUnique({
+            where: { id: projectId, userId: userId }
+        });
+
+        if (!creation) {
+            return res.status(404).json({ error: "Creation not found" });
+        }
+
+        await prisma.project.delete({
+            where: { id: projectId, userId: userId }
+        });
+
+
+        res.json({ message: "Creation deleted successfully" });
     } catch (error: any) {
         console.error("Error deleting creation:", error);
         res.status(500).json({ error: "Failed to delete creation" });
