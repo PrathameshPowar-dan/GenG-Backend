@@ -33,7 +33,6 @@ model Project {
   generatedImage     String   @default("")
   generatedVideo     String   @default("")
   isGenerating       Boolean  @default(false)
-  isPublished        Boolean  @default(false)
   error              String   @default("")
 
   createdAt DateTime @default(now())
