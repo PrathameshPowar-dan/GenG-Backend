@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 import ClerkWebHook from "./controllers/clerk.js";
+import userRoutes from "./routes/userRoutes.js";
 
 const app = express();
 
@@ -18,6 +19,8 @@ const port = process.env.PORT || 8001;
 app.get('/', (req: Request, res: Response) => {
     res.send('Server is Live!');
 });
+
+app.use('/api/user', userRoutes);
 
 
 app.listen(port, () => {
