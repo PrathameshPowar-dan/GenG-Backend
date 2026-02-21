@@ -9,7 +9,10 @@ import creationRoutes from "./routes/creationRoutes.js";
 const app = express();
 
 // Middleware
-app.use(cors())
+app.use(cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true
+}));
 
 app.post("/api/clerk",express.raw({type: 'application/json'}), ClerkWebHook);
 app.use(express.json());

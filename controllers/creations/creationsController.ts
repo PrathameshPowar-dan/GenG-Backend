@@ -284,13 +284,13 @@ export const createVideoCreation = async (req: Request, res: Response) => {
         res.json({ message: "Video generation successful", videoUrl: uploadResult.secure_url });
 
     } catch (error: any) {
-            await prisma.project.update({
-                where: { id: projectId, userId: userId },
-                data: {
-                    isGenerating: false,
-                    error: error.message || "Failed to generate video"
-                }
-            })
+        await prisma.project.update({
+            where: { id: projectId, userId: userId },
+            data: {
+                isGenerating: false,
+                error: error.message || "Failed to generate video"
+            }
+        })
 
         if (isVideoCreditDeducted) {
             await prisma.user.update({
@@ -329,7 +329,7 @@ export const deleteCreation = async (req: Request, res: Response) => {
 
 
         res.json({ message: "Creation deleted successfully" });
-        
+
     } catch (error: any) {
         console.error("Error deleting creation:", error);
         res.status(500).json({ error: "Failed to delete creation" });
