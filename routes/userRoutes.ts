@@ -6,6 +6,6 @@ const router = express.Router();
 
 router.get("/credits", protect, getUserCredits);
 router.get("/creations", protect, getAllUserCreations);
-router.get("/creation/:id", protect, getCreationById);
+router.get("/creation/:Projectid", protect, getCreationById);
 
 export default router;
