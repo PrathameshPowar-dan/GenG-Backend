@@ -31,7 +31,7 @@ export const getAllUserCreations = async (req: Request, res: Response) => {
         }
 
         const creations = await prisma.project.findMany({
-            where: { id: userId },
+            where: { userId: userId },
             orderBy: { createdAt: "desc" },
         });
 

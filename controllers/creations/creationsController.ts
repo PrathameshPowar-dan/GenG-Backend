@@ -317,13 +317,11 @@ export const createVideoCreation = async (req: Request, res: Response) => {
 // Controller to delete creation
 export const deleteCreation = async (req: Request, res: Response) => {
     try {
+        const { userId } = req.auth(); 
+        const { id } = req.params; 
 
-        const { userId } = req.auth();
-        const { ProjectId } = req.params;
-
-        const projectId = Array.isArray(ProjectId) ? ProjectId[0] : ProjectId;
-
-        const creation = await prisma.project.findUnique({
+        const projectId = Array.isArray(id) ? id[0] : id;
+        const creation = await prisma.project.findFirst({
             where: { id: projectId, userId: userId }
         });
 
