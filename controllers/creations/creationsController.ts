@@ -181,8 +181,15 @@ export const createImageCreation = async (req: Request, res: Response) => {
 // Controller to create video
 export const createVideoCreation = async (req: Request, res: Response) => {
     const { userId } = req.auth();
-    const { projectId } = req.body;
     let isVideoCreditDeducted = false;
+    let creation: any;
+
+    const { name = "Video1", aspectRatio, userPrompt, productName, targetLength = 5 } = req.body;
+    const images: any = req.files;
+
+    if (images.length < 2 || !productName) {
+        return res.status(400).json({ error: "At least 2 images and product name are required" });
+    }
 
     const user = await prisma.user.findUnique({
         where: { id: userId }
@@ -198,47 +205,47 @@ export const createVideoCreation = async (req: Request, res: Response) => {
     }).then(() => { isVideoCreditDeducted = true });
 
     try {
-        const creation = await prisma.project.findUnique({
-            where: { id: projectId, userId: userId },
-            include: {
-                user: true
+        // Upload images to Cloudinary
+        let uploadedImages = await Promise.all(
+            images.map(async (i: any) => {
+                let res = await cloudinary.uploader.upload(i.path, {
+                    resource_type: "image",
+                });
+                return res.secure_url;
+            })
+        );
+
+        // Create project record
+        const creation = await prisma.project.create({
+            data: {
+                name,
+                aspectRatio,
+                userPrompt,
+                productName,
+                targetLength: parseInt(targetLength),
+                userId,
+                uploadedImages,
+                isGenerating: true
             }
         });
 
-        if (!creation || creation.isGenerating) {
-            return res.status(400).json({ error: "Project is already generating" });
-        }
-
-        if (creation.generatedVideo) {
-            return res.status(400).json({ error: "Video already generated" });
-        }
-
-        await prisma.project.update({
-            where: { id: projectId },
-            data: { isGenerating: true }
-        });
-
-        const prompt = `Make the person showcase the product which is ${creation.productName} and do it in a natural and humanly way. Make the video look like a real person is showcasing the product in a real environment. The video should be of ecommerce-quality. ${creation.userPrompt ? `Incorporate this user prompt into the video: ${creation.userPrompt}` : ""}`;
+        const prompt = `Make the person showcase the product which is ${productName} and do it in a natural and humanly way. Make the video look like a real person is showcasing the product in a real environment. The video should be of ecommerce-quality. ${userPrompt ? `Incorporate this user prompt into the video: ${userPrompt}` : ""}`;
 
         const model = "veo-3.1-generate-preview";
 
-        if (!creation.generatedImage) {
-            throw new Error("No generated image found for video creation");
-        }
-
-        const image = await axios.get(creation.generatedImage, { responseType: 'arraybuffer' });
-
-        const imageBytes: any = Buffer.from(image.data)
+        // Convert first image to base64
+        const image = Buffer.from(fs.readFileSync(images[0].path));
+        const imageBytes: any = image
 
         let operation: any = await ai.models.generateVideos({
             model,
             prompt,
             image: {
                 imageBytes: imageBytes.toString('base64'),
-                mimeType: "image/png"
+                mimeType: images[0].mimetype || "image/png"
             },
             config: {
-                aspectRatio: creation?.aspectRatio || '9:16',
+                aspectRatio: aspectRatio || '9:16',
                 numberOfVideos: 1,
                 resolution: "720p",
             }
@@ -270,9 +277,8 @@ export const createVideoCreation = async (req: Request, res: Response) => {
             resource_type: "video",
         });
 
-
         await prisma.project.update({
-            where: { id: projectId },
+            where: { id: creation.id },
             data: {
                 generatedVideo: uploadResult.secure_url,
                 isGenerating: false
@@ -281,16 +287,18 @@ export const createVideoCreation = async (req: Request, res: Response) => {
 
         fs.unlinkSync(filePath);
 
-        res.json({ message: "Video generation successful", videoUrl: uploadResult.secure_url });
+        res.json({ message: "Video generation successful", videoUrl: uploadResult.secure_url, creationId: creation.id });
 
     } catch (error: any) {
-        await prisma.project.update({
-            where: { id: projectId, userId: userId },
-            data: {
-                isGenerating: false,
-                error: error.message || "Failed to generate video"
-            }
-        })
+        if (creation) {
+            await prisma.project.update({
+                where: { id: creation.id },
+                data: {
+                    isGenerating: false,
+                    error: error.message || "Failed to generate video"
+                }
+            })
+        }
 
         if (isVideoCreditDeducted) {
             await prisma.user.update({
