@@ -18,11 +18,12 @@ const loadImage = (path: string, mimeType: string) => {
 
 // Controller to create image
 export const createImageCreation = async (req: Request, res: Response) => {
-    let tempProjectId: string | undefined;
+    let tempProjectId: string;
     const { userId } = req.auth();
     let isImageCreditDeducted = false;
 
     const { name = "PRo1", aspectRatio, userPrompt, productName, targetLength = 5 } = req.body;
+
     const images: any = req.files;
 
     if (images.length < 2 || !productName) {
@@ -40,9 +41,10 @@ export const createImageCreation = async (req: Request, res: Response) => {
             where: { id: userId },
             data: { ImageCredits: { decrement: 1 } }
         }).then(() => { isImageCreditDeducted = true });
-    }
+    };
 
     try {
+
         let uploadedImages = await Promise.all(
             images.map(async (i: any) => {
                 let res = await cloudinary.uploader.upload(i.path, {
@@ -67,7 +69,7 @@ export const createImageCreation = async (req: Request, res: Response) => {
 
         tempProjectId = creation.id;
 
-        const model = "gemini-3-pro-image-preview"; // Or your specific image generation model
+        const model = "gemini-3-pro-image-preview";
 
         const generationConfig: GenerateContentConfig = {
             maxOutputTokens: 32768,
@@ -79,13 +81,26 @@ export const createImageCreation = async (req: Request, res: Response) => {
                 imageSize: "1K"
             },
             safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF },
+                {
+                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    threshold: HarmBlockThreshold.OFF,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    threshold: HarmBlockThreshold.OFF,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    threshold: HarmBlockThreshold.OFF,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    threshold: HarmBlockThreshold.OFF,
+                },
             ]
         };
 
+        // Images to base 64
         const image1base64 = loadImage(images[0].path, images[0].mimetype);
         const image2base64 = loadImage(images[1].path, images[1].mimetype);
 
@@ -109,10 +124,11 @@ export const createImageCreation = async (req: Request, res: Response) => {
         }
 
         const parts = response.candidates[0].content.parts;
+
         let buffer: Buffer | null = null;
 
         for (const part of parts) {
-            if (part.inlineData) { // FIX: Changed parts to part
+            if (parts.inlineData) {
                 buffer = Buffer.from(part.inlineData.data, 'base64');
             }
         }
@@ -122,6 +138,7 @@ export const createImageCreation = async (req: Request, res: Response) => {
         }
 
         const base64Image = `data:image/png;base64,${buffer.toString('base64')}`;
+
         const uploadResponse = await cloudinary.uploader.upload(base64Image, {
             resource_type: "image",
         });
@@ -137,7 +154,7 @@ export const createImageCreation = async (req: Request, res: Response) => {
         res.json({ creationId: creation.id });
 
     } catch (error: any) {
-        if (tempProjectId) { // FIX: Removed invalid ! operator
+        if (tempProjectId!) {
             await prisma.project.update({
                 where: { id: tempProjectId },
                 data: {
@@ -150,7 +167,9 @@ export const createImageCreation = async (req: Request, res: Response) => {
         if (isImageCreditDeducted) {
             await prisma.user.update({
                 where: { id: userId },
-                data: { ImageCredits: { increment: 1 } }
+                data: {
+                    ImageCredits: { increment: 1 }
+                }
             })
         }
 
@@ -186,6 +205,7 @@ export const createVideoCreation = async (req: Request, res: Response) => {
     }).then(() => { isVideoCreditDeducted = true });
 
     try {
+        // Upload images to Cloudinary
         let uploadedImages = await Promise.all(
             images.map(async (i: any) => {
                 let res = await cloudinary.uploader.upload(i.path, {
@@ -195,8 +215,8 @@ export const createVideoCreation = async (req: Request, res: Response) => {
             })
         );
 
-        // FIX: Removed 'const' so the outer 'creation' variable is updated for the catch block
-        creation = await prisma.project.create({
+        // Create project record
+        const creation = await prisma.project.create({
             data: {
                 name,
                 aspectRatio,
@@ -211,10 +231,11 @@ export const createVideoCreation = async (req: Request, res: Response) => {
 
         const prompt = `Make the person showcase the product which is ${productName} and do it in a natural and humanly way. Make the video look like a real person is showcasing the product in a real environment. The video should be of ecommerce-quality. ${userPrompt ? `Incorporate this user prompt into the video: ${userPrompt}` : ""}`;
 
-        const model = "veo-3.1-generate-preview"; // Or your specific video model
+        const model = "veo-3.1-generate-preview";
 
+        // Convert first image to base64
         const image = Buffer.from(fs.readFileSync(images[0].path));
-        const imageBytes: any = image;
+        const imageBytes: any = image
 
         let operation: any = await ai.models.generateVideos({
             model,
@@ -245,12 +266,12 @@ export const createVideoCreation = async (req: Request, res: Response) => {
 
         if (!operation.response.generatedVideos) {
             throw new Error(operation.response.raiMediaFilteredReason[0] || "No video generated");
-        }
+        };
 
         await ai.files.download({
             file: operation.response.generatedVideos[0].video,
             downloadPath: filePath
-        });
+        })
 
         const uploadResult = await cloudinary.uploader.upload(filePath, {
             resource_type: "video",
@@ -282,7 +303,9 @@ export const createVideoCreation = async (req: Request, res: Response) => {
         if (isVideoCreditDeducted) {
             await prisma.user.update({
                 where: { id: userId },
-                data: { VideoCredits: { increment: 1 } }
+                data: {
+                    VideoCredits: { increment: 1 }
+                }
             })
         }
 
@@ -294,14 +317,13 @@ export const createVideoCreation = async (req: Request, res: Response) => {
 // Controller to delete creation
 export const deleteCreation = async (req: Request, res: Response) => {
     try {
-        const { userId } = req.auth();
-        
-        // FIX: Match the actual route parameter from your creationRoutes.ts
-        const { id } = req.params; 
-        const projectId = Array.isArray(id) ? id[0] : id;
 
-        // FIX: Change to findFirst so you can search by multiple non-compound unique fields
-        const creation = await prisma.project.findFirst({
+        const { userId } = req.auth();
+        const { ProjectId } = req.params;
+
+        const projectId = Array.isArray(ProjectId) ? ProjectId[0] : ProjectId;
+
+        const creation = await prisma.project.findUnique({
             where: { id: projectId, userId: userId }
         });
 
@@ -312,6 +334,7 @@ export const deleteCreation = async (req: Request, res: Response) => {
         await prisma.project.delete({
             where: { id: projectId }
         });
+
 
         res.json({ message: "Creation deleted successfully" });
 
