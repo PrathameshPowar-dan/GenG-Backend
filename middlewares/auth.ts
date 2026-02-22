@@ -8,7 +8,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
         // 2. Check what Clerk parsed
         // console.log("Clerk Auth Object:", req.auth());
         const {userId} = req.auth();
-        console.log(userId)
+        // console.log(userId)
 
         if (!userId) {
             return res.status(401).json({ message: "Unauthorized" });

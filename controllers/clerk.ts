@@ -50,8 +50,8 @@ const ClerkWebHook = async (req: Request, res: Response) => {
                     
                     const planAllocations: Record<string, { image: number, video: number }> = {
                         "pro_user": {
-                            image: 999999, // Massive number represents 'Unlimited'
-                            video: 10      
+                            image: 25, // Massive number represents 'Unlimited'
+                            video: 5      
                         }
                     };
 
