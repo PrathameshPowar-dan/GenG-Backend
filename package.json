@@ -14,9 +14,9 @@
   },
   "type": "module",
   "scripts": {
-    "start": "tsx server.ts",
+    "start": "node dist/server.js",
     "server": "nodemon --exec npx tsx server.ts",
-    "build": "tsc"
+    "build": "npx prisma generate && npx tsc"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

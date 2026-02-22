@@ -6,6 +6,7 @@ import fs from "fs";
 import ai from "../../configs/ai.js";
 import axios from "axios";
 import path from "path";
+import os from "os";
 
 const loadImage = (path: string, mimeType: string) => {
     return {
@@ -18,7 +19,7 @@ const loadImage = (path: string, mimeType: string) => {
 
 // Controller to create image
 export const createImageCreation = async (req: Request, res: Response) => {
-    let tempProjectId: string;
+    let tempProjectId: string | undefined;
     const { userId } = req.auth();
     let isImageCreditDeducted = false;
 
@@ -81,22 +82,10 @@ export const createImageCreation = async (req: Request, res: Response) => {
                 imageSize: "1K"
             },
             safetySettings: [
-                {
-                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                    threshold: HarmBlockThreshold.OFF,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                    threshold: HarmBlockThreshold.OFF,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold: HarmBlockThreshold.OFF,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold: HarmBlockThreshold.OFF,
-                },
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.OFF },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF },
             ]
         };
 
@@ -128,7 +117,7 @@ export const createImageCreation = async (req: Request, res: Response) => {
         let buffer: Buffer | null = null;
 
         for (const part of parts) {
-            if (parts.inlineData) {
+            if (part.inlineData) {
                 buffer = Buffer.from(part.inlineData.data, 'base64');
             }
         }
@@ -154,7 +143,7 @@ export const createImageCreation = async (req: Request, res: Response) => {
         res.json({ creationId: creation.id });
 
     } catch (error: any) {
-        if (tempProjectId!) {
+        if (tempProjectId) {
             await prisma.project.update({
                 where: { id: tempProjectId },
                 data: {
@@ -167,9 +156,7 @@ export const createImageCreation = async (req: Request, res: Response) => {
         if (isImageCreditDeducted) {
             await prisma.user.update({
                 where: { id: userId },
-                data: {
-                    ImageCredits: { increment: 1 }
-                }
+                data: { ImageCredits: { increment: 1 } }
             })
         }
 
@@ -215,8 +202,7 @@ export const createVideoCreation = async (req: Request, res: Response) => {
             })
         );
 
-        // Create project record
-        const creation = await prisma.project.create({
+        creation = await prisma.project.create({
             data: {
                 name,
                 aspectRatio,
@@ -260,9 +246,9 @@ export const createVideoCreation = async (req: Request, res: Response) => {
         }
 
         const filename = `${userId}-${Date.now()}.mp4`;
-        const filePath = path.join("videos", filename);
-
-        fs.mkdirSync("videos", { recursive: true });
+        
+        // FIX: Route through system temp directory for Render deployment
+        const filePath = path.join(os.tmpdir(), filename);
 
         if (!operation.response.generatedVideos) {
             throw new Error(operation.response.raiMediaFilteredReason[0] || "No video generated");
@@ -303,9 +289,7 @@ export const createVideoCreation = async (req: Request, res: Response) => {
         if (isVideoCreditDeducted) {
             await prisma.user.update({
                 where: { id: userId },
-                data: {
-                    VideoCredits: { increment: 1 }
-                }
+                data: { VideoCredits: { increment: 1 } }
             })
         }
 
@@ -321,6 +305,7 @@ export const deleteCreation = async (req: Request, res: Response) => {
         const { id } = req.params; 
 
         const projectId = Array.isArray(id) ? id[0] : id;
+        
         const creation = await prisma.project.findFirst({
             where: { id: projectId, userId: userId }
         });
